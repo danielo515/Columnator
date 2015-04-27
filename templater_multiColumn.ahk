@@ -16,6 +16,7 @@ SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 columns := 2
 maxcolumns :=5
 colwidth := 200 ; widht of each column
+colmargin := 10
 gosub, showMainGui
 Return
 
@@ -24,22 +25,27 @@ showMainGui:
         Menu, Columns, add, %A_Index%, columnmanager    
 
     Menu, MenuBar, Add, &Columns , :Columns
-    Menu, Operations, add, Remove one column, Reload
     Menu, Operations, add, Fill column with numbers, fillCol
     Menu, MenuBar, Add, &Operations , :Operations
 
     gui, mainGui:new
     gui, mainGui:Default
     Gui, Menu,MenuBar
-    Gui, Add, Text,, Template
-    Gui, Add, Edit, vTemplate w400
-    Gui, Add, Text,, Input
+    groupboxwidth := ( colwidth + colmargin ) * columns +10
+    Gui, Add, GroupBox, x10 w%groupboxwidth% h40 vgroupboxtemplate, Template
+    templatewidth := groupboxwidth -20
+    Gui, Add, Edit, xp+10 yp+15 vTemplate w%templatewidth%, %template%
+    Gui, Add, GroupBox, x10 w%groupboxwidth% r11 Section vgroupboxcolumns, Input columns
     loop, %columns%
-    {
-        xpos := A_Index = 1 ? 0 : colwidth
-        Gui, Add, Edit, vcol%A_Index% w200 R15 XP+%xpos%, col%A_Index%
+    {  
+        xpos := A_Index = 1 ? 10 : colwidth +colmargin
+        colContent := col%A_Index% ; use the previous column content (util in case of redraw)
+        Gui, Add, Edit, vcol%A_Index% w200 R15 ys+20 Xp+%xpos%, %colContent%
     }
-    Gui, Add, Edit, vOutput w400 R15 yp+215 xs
+    Menu, Columns, Check, %columns% ;check the current number of columns
+    Gui, Add, GroupBox, x10 w%groupboxwidth% r11 vgroupboxoutput, Output
+    outputwidth := groupboxwidth -20
+    Gui, Add, Edit, vOutput w%outputwidth% R15 yp+15 xp+10, %Output%
 
     Gui, Add, Button, gSave w200 xs, OK
     Gui, Add, Button, xp+210 yp gGuiClose w200, Close
@@ -48,9 +54,9 @@ showMainGui:
     Gui, Show
 return
 
-Reload:
-columns -= 1
-gosub, showMainGui
+adjustGroupboxes:
+    groupboxwidth := ( colwidth + colmargin) * columns +10
+    GuiControl, Move , groupboxcolumns,w%groupboxwidth%
 return
 
 Save:
@@ -103,33 +109,42 @@ Loop, %RangeEnd%
     guiControl,mainGui:,col%selected_col%, %result%
 return
 
-columnmanager(ItemName, ItemPos, MenuName){
+columnmanager(ItemName, ItemPos, MenuName:="Columns"){
     global
     Loop, %maxcolumns%
         Menu, %MenuName%, UnCheck, %A_Index%
       
-    if( itemname > columns)
-        loop, %itemname%
+    if( itemname > columns){
+        loop, %itemname% ; itemname holds the number of selected columns
             if( A_Index > columns){
                 GuiControlGet, prevcol,Pos,col%columns%
-                Gui, mainGui:Add, Edit, vcol%A_Index% w200 R15 Y%prevcolY% xp+%prevcolW% , col%A_Index%
+                nextColxPos := prevcolx + prevcolw + colmargin
+                Gui, mainGui:Add, Edit, vcol%A_Index% w200 R15 Y%prevcolY% x%nextColxPos% , col%A_Index%
                 columns +=1
+                gosub, adjustGroupboxes
                 gui, show, AutoSize
             }
-            
+    }else if(itemname < columns){ ;if less columns asked just redraw the whole GUI
+        columns := itemname
+        gui, maingui:submit,NoHide
+        gosub,showmaingui
+    }
     Menu, %MenuName%, Check, %ItemName%
 return
 }
 
 mainGuiGuisize:
- gui, mainGui:Default
  AutoXYWH("0.5w y","OK")
- AutoXYWH("y 0.5x","Close")
+ AutoXYWH("0.5x y","Close")
  AutoXYWH("wh","Output")
  AutoXYWH("w","Template")
-
+ AutoXYWH("*w","groupboxtemplate","groupboxoutput")
+ if( A_GuiWidth > (( colwidth + colmargin ) * (columns+1) + 10) ){ ;if there is space  for another column
+    columnmanager(columns+1,columns+1) ;add anohter column
+    }
 return
 
+mainGuiGuiClose:
 GuiClose:
 ExitApp
 return
