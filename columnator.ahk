@@ -12,7 +12,8 @@
 #NoEnv  ; Recommended for performance and compatibility with future AutoHotkey releases.
 SendMode Input  ; Recommended for new scripts due to its superior speed and reliability.
 SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
-
+config :=ReadIni()
+templates :=new _template(config["templates"])
 columns := 2
 maxcolumns :=5
 colwidth := 200 ; widht of each column
@@ -34,7 +35,11 @@ showMainGui:
     groupboxwidth := ( colwidth + colmargin ) * columns +10
     Gui, Add, GroupBox, x10 w%groupboxwidth% h40 vgroupboxtemplate, Template
     templatewidth := groupboxwidth -20
-    Gui, Add, Edit, xp+10 yp+15 vTemplate w%templatewidth%, %template%
+    if(template){
+        templates.add(template)
+        }
+    template := templates.join()    
+    Gui, Add, ComboBox , xp+10 yp+15 vTemplate w%templatewidth%, %template%
     Gui, Add, GroupBox, x10 w%groupboxwidth% r11 Section vgroupboxcolumns, Input columns
     loop, %columns%
     {  
@@ -148,6 +153,79 @@ mainGuiGuiClose:
 GuiClose:
 ExitApp
 return
+
+class _template{
+
+    __New(templates){
+        this.templates := templates
+    }
+    
+    join(){
+        for template_name,template in this.templates{
+            sep:= this.selectedTemplate = template ? "||" : "|" ; this way we avoid the sep to before first
+            result .= template . sep
+        }
+        return result
+    }
+    
+    add(template){
+        if(!this.contains(template)){
+            this.templates.push(template)
+        }
+        this.selectedTemplate := template
+    }
+    
+    contains(item){
+        result := 0
+        for template_name,template in this.templates{
+            if(result) 
+                break
+            result := template = item
+        }
+        return result
+    }
+    
+    select(template){
+        this.selectedTemplate := template
+    }
+
+}
+
+;==================================================================================
+; Reads ini files into an object
+; Sections are turned into objects
+; keys are turned into keys of section objects
+; ---------------------------------------------------------------------------------
+; Release date: 2015-04-28
+; Author      : Danielo
+; =================================================================================
+ReadIni( filename:=0 )
+{
+	if not filename
+		filename := SubStr( A_ScriptName, 1, -3 ) . "ini"
+
+	FileRead, s, %filename%
+    
+    result := Object()
+	Loop, Parse, s, `n`r, %A_Space%%A_Tab%
+	{
+		c := SubStr(A_LoopField, 1, 1)
+		if (c="[")
+			key := SubStr(A_LoopField, 2, -1) ; get everything from second character but not last one
+		else if (c=";") ;ignore comments
+			continue
+		else {
+			p := InStr(A_LoopField, "=") ;value
+			if p {
+                if(!result[key]) ;create section object if does not exist
+                    result[key] := Object()
+                k := SubStr(A_LoopField, 1, p-1)
+				result[key][k] := SubStr(A_LoopField, p+1)
+			}
+		}
+	}
+    return result
+}
 
 ; =================================================================================
 ; Function: AutoXYWH
