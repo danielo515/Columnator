@@ -28,6 +28,7 @@ showMainGui:
 
     Menu, MenuBar, Add, &Columns , :Columns
     Menu, Operations, add, Fill column with numbers, fillCol
+    Menu, Operations, add, Split column, splitColGui
     Menu, Operations, add, Import from csv file,parseCsv
     Menu, MenuBar, Add, &Operations , :Operations
 
@@ -90,7 +91,40 @@ guiControl,,Output, %result%
 Clipboard := result
 return
 
-fillCol:
+splitColGui: ; Gui for split column
+columnslist =
+loop,%columns%
+    columnslist .= A_Index . (A_Index > 1 ? "|" : "||")
+    Gui, splitGui:New,, Split column
+    Gui, splitGui:Default
+    Gui,+ToolWindow
+    Gui,Add,GroupBox,x10 y10 w85 h50 ,Column to split
+    Gui,Add,DropDownList,xp+10 yp+20 w50 vselected_col,%columnslist%
+    Gui,Add,GroupBox, ys w70 h50,Split using
+    Gui,Add,Edit,xp+15 ys+20 wp-30 h21 vsplitChar, `,
+    Gui,Add,Button,ys+8 w60 h40 gsplitCol,Split!
+    GuiControl, Focus,splitChar
+    Gui,Show,x536 y349 w490 h71 AutoSize,
+return
+
+splitCol:
+    Gui,submit
+    GuiControlGet, rawCol, mainGui:, col%selected_col%
+    newColumns:=splitLines2Columns(rawCol,splitChar)
+    for, index,val in newColumns
+        guiControl,mainGui:,col%index%, %val%
+return
+
+splitLines2Columns(text,splitChar){
+    columns := Object()
+    Loop, parse, text, `n
+        Loop, parse, A_LoopField, %splitChar%
+            columns[A_Index] .= A_LoopField . "`r`n"
+        
+    return columns
+}
+
+fillCol: ;gui for range fill
 columnslist =
 loop,%columns%
     columnslist .= A_Index . (A_Index > 1 ? "|" : "||")
