@@ -15,9 +15,10 @@ SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 config :=ReadIni()
 templates :=new _template(config["templates"])
 columns := 2
-maxcolumns :=5
+maxcolumns :=7
 colwidth := 200 ; widht of each column
 colmargin := 10
+Delim=`a
 gosub, showMainGui
 Return
 
@@ -27,10 +28,12 @@ showMainGui:
 
     Menu, MenuBar, Add, &Columns , :Columns
     Menu, Operations, add, Fill column with numbers, fillCol
+    Menu, Operations, add, Import from csv file,parseCsv
     Menu, MenuBar, Add, &Operations , :Operations
 
     gui, mainGui:new
     gui, mainGui:Default
+    gui, mainGui:+Delimiter%Delim%
     Gui, Menu,MenuBar
     groupboxwidth := ( colwidth + colmargin ) * columns +10
     Gui, Add, GroupBox, x10 w%groupboxwidth% h40 vgroupboxtemplate, Template
@@ -38,7 +41,7 @@ showMainGui:
     if(template){
         templates.add(template)
         }
-    template := templates.join()    
+    template := templates.join(Delim)    
     Gui, Add, ComboBox , xp+10 yp+15 vTemplate w%templatewidth%, %template%
     Gui, Add, GroupBox, x10 w%groupboxwidth% r11 Section vgroupboxcolumns, Input columns
     loop, %columns%
@@ -65,8 +68,9 @@ adjustGroupboxes:
 return
 
 Save:
-Gui, Submit, NoHide
-result =
+    Gui, Submit, NoHide
+    result =
+    templates.add(template) ; once submitted, add the used template to the templates list
     colvalues := Object()
 	Loop, %columns%	{	
 		colvalues.push(StrSplit(col%a_index%,"`n","`r"))
@@ -114,6 +118,26 @@ Loop, %RangeEnd%
     guiControl,mainGui:,col%selected_col%, %result%
 return
 
+parseCsv:
+FileSelectFile, csvFile, 1, %A_WorkingDir%, Select a csv file, *.csv
+csv_cols := []
+    Loop, read, %csvFile%
+    {
+        LineNumber = %A_Index%
+        Loop, parse, A_LoopReadLine, CSV
+        {
+            csv_cols[A_Index] .= A_LoopField . "`r" . "`n"
+        }
+    }
+    
+    for index,value in csv_cols {
+        if( index > columns)
+            columnmanager(index,index)
+        guiControl,,col%index%,%value%
+    }
+return
+
+
 columnmanager(ItemName, ItemPos, MenuName:="Columns"){
     global
     Loop, %maxcolumns%
@@ -139,14 +163,17 @@ return
 }
 
 mainGuiGuisize:
- AutoXYWH("0.5w y","OK")
- AutoXYWH("0.5x y","Close")
+ AutoXYWH("w0.5 y","OK")
+ AutoXYWH("x0.5 w0.5 y","Close")
  AutoXYWH("wh","Output")
  AutoXYWH("w","Template")
  AutoXYWH("*w","groupboxtemplate","groupboxoutput")
- if( A_GuiWidth > (( colwidth + colmargin ) * (columns+1) + 10) ){ ;if there is space  for another column
-    columnmanager(columns+1,columns+1) ;add anohter column
-    }
+ colWidthPercent := 1/columns
+ ;~ Loop, %columns%
+    ;~ if(A_index = 1)
+        ;~ AutoXYWH("w" . colWidthPercent,"col" . A_Index)
+    ;~ else
+        ;~ AutoXYWH("x" . colWidthPercent . " w" . colWidthPercent,"col" . A_Index)
 return
 
 mainGuiGuiClose:
@@ -160,9 +187,9 @@ class _template{
         this.templates := templates
     }
     
-    join(){
+    join(delim){ ; the delimiter the window is using. Used in comboboxes
         for template_name,template in this.templates{
-            sep:= this.selectedTemplate = template ? "||" : "|" ; this way we avoid the sep to before first
+            sep:= this.selectedTemplate = template ? delim+delim : delim
             result .= template . sep
         }
         return result
